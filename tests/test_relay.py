@@ -89,9 +89,7 @@ async def test_events_are_published_by_id_even_when_physical_order_differs(sessi
 
     await publish_batch(session_factory, broker, limit=1)
 
-    assert [message for message, _ in broker.published] == [
-        {"payment_id": "a", "touched": True}
-    ]
+    assert [message for message, _ in broker.published] == [{"payment_id": "a", "touched": True}]
 
 
 async def test_publish_goes_to_payments_exchange_persistently(session_factory):

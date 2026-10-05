@@ -40,8 +40,24 @@ webhook придёт полное состояние платежа.
 curl -s http://localhost:8000/api/v1/payments/<payment_id> -H "X-API-Key: dev-api-key"
 ```
 
-Повтор с тем же `Idempotency-Key` и тем же телом вернёт тот же `payment_id`; с
-другим телом — `409`. Без `X-API-Key` или с неверным — `401`.
+Повтор с тем же `Idempotency-Key` и тем же телом вернёт тот же `payment_id`.
+
+Тот же `Idempotency-Key` с другим телом — `409`:
+
+```bash
+curl -i -X POST http://localhost:8000/api/v1/payments   -H "X-API-Key: dev-api-key" -H "Idempotency-Key: order-42"   -H "Content-Type: application/json"   -d '{"amount": "999.00", "currency": "RUB", "description": "Другой заказ",
+       "metadata": {}, "webhook_url": "https://webhook.site/<ваш-id>"}'
+```
+
+Ожидаемый ответ: `HTTP/1.1 409 Conflict`.
+
+Без `X-API-Key` или с неверным — `401`:
+
+```bash
+curl -i http://localhost:8000/api/v1/payments/<payment_id> -H "X-API-Key: wrong"
+```
+
+Ожидаемый ответ: `HTTP/1.1 401 Unauthorized`.
 
 ## Повторы и DLQ
 

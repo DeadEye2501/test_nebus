@@ -1,23 +1,20 @@
-"""Relay outbox: публикует неопубликованные события в RabbitMQ и отмечает их."""
+"""Relay outbox: перенос неопубликованных событий в RabbitMQ."""
 
 import asyncio
 import logging
 
 from faststream.rabbit import RabbitBroker
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings, get_settings
-from app.db import get_sessionmaker
+from app.db import Sessions, get_sessionmaker
 from app.models import OutboxEvent
 from app.topology import EXCHANGE, NEW_KEY, declare, make_broker
 
 logger = logging.getLogger(__name__)
 
 
-async def publish_batch(
-    session_factory: async_sessionmaker[AsyncSession], broker: RabbitBroker, limit: int
-) -> int:
+async def publish_batch(session_factory: Sessions, broker: RabbitBroker, limit: int) -> int:
     async with session_factory() as session, session.begin():
         events = (
             await session.scalars(
@@ -29,15 +26,14 @@ async def publish_batch(
             )
         ).all()
         for event in events:
-            # Доверять публикации можно только с confirms и on_return_raises: иначе возврат без очереди теряет событие.
-            await broker.publish(event.payload, exchange=EXCHANGE, routing_key=NEW_KEY, persist=True)
+            await broker.publish(
+                event.payload, exchange=EXCHANGE, routing_key=NEW_KEY, persist=True
+            )
             event.published_at = func.now()
     return len(events)
 
 
-async def run(
-    session_factory: async_sessionmaker[AsyncSession], broker: RabbitBroker, settings: Settings
-) -> None:
+async def run(session_factory: Sessions, broker: RabbitBroker, settings: Settings) -> None:
     while True:
         try:
             published = await publish_batch(session_factory, broker, settings.outbox_batch_size)

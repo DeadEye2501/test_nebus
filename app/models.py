@@ -53,9 +53,7 @@ class Payment(Base):
     currency: Mapped[Currency] = mapped_column(_db_enum(Currency, "currency"))
     description: Mapped[str] = mapped_column(String(500))
     # Имя metadata занято декларативной базой SQLAlchemy.
-    meta: Mapped[dict] = mapped_column(
-        "metadata", JSONB, server_default=text("'{}'::jsonb")
-    )
+    meta: Mapped[dict] = mapped_column("metadata", JSONB, server_default=text("'{}'::jsonb"))
     status: Mapped[PaymentStatus] = mapped_column(
         _db_enum(PaymentStatus, "payment_status"), server_default=PaymentStatus.PENDING.value
     )

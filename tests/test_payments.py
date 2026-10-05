@@ -26,7 +26,9 @@ async def test_create_stores_pending_payment_and_one_outbox_event(session_factor
     assert [event.payload for event in events] == [{"payment_id": str(payment.id)}]
 
 
-async def test_repeat_with_same_key_and_body_returns_same_payment_without_new_event(session_factory):
+async def test_repeat_with_same_key_and_body_returns_same_payment_without_new_event(
+    session_factory,
+):
     first = await create_payment(session_factory, "key-1", payment_body())
     second = await create_payment(session_factory, "key-1", payment_body())
 
@@ -76,7 +78,9 @@ def _miss_first_lookup(monkeypatch):
     monkeypatch.setattr(payments, "_find_by_key", find)
 
 
-async def test_lost_insert_race_with_same_body_returns_existing_payment(session_factory, monkeypatch):
+async def test_lost_insert_race_with_same_body_returns_existing_payment(
+    session_factory, monkeypatch
+):
     first = await create_payment(session_factory, "key-1", payment_body())
     _miss_first_lookup(monkeypatch)
 

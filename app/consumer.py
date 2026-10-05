@@ -1,4 +1,4 @@
-"""Consumer очереди payments.new: проводит платёж, шлёт webhook, уводит сбои в повторы и DLQ."""
+"""Consumer очереди payments.new: маршрутизация сообщения — обработка, повтор, DLQ."""
 
 import asyncio
 import logging
@@ -26,14 +26,16 @@ async def handle(broker: RabbitBroker, processor: Processor, body: bytes, header
     try:
         attempt = _attempt(headers)
         event = NewPaymentEvent.model_validate_json(body)
-    except ValueError as exc:
+    except (ValueError, TypeError) as exc:
         logger.exception("Битое сообщение, в DLQ без повторов")
         await _forward(broker, body, DLQ_KEY, {ERROR_HEADER: _describe(exc)})
         return
     try:
         await processor.process(event.payment_id)
     except Exception as exc:
-        logger.exception("Платёж %s: попытка %s из %s не удалась", event.payment_id, attempt, MAX_ATTEMPTS)
+        logger.exception(
+            "Платёж %s: попытка %s из %s не удалась", event.payment_id, attempt, MAX_ATTEMPTS
+        )
         if attempt >= MAX_ATTEMPTS:
             failure = {ATTEMPT_HEADER: attempt, ERROR_HEADER: _describe(exc)}
             await _forward(broker, body, DLQ_KEY, failure)

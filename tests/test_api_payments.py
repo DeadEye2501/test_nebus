@@ -93,9 +93,7 @@ async def test_missing_idempotency_key_is_422(client):
 
 @pytest.mark.parametrize("idempotency_key", ["", "k" * 256])
 async def test_idempotency_key_out_of_bounds_is_422(client, idempotency_key):
-    response = await client.post(
-        "/api/v1/payments", json=BODY, headers=_headers(idempotency_key)
-    )
+    response = await client.post("/api/v1/payments", json=BODY, headers=_headers(idempotency_key))
 
     assert response.status_code == 422
 

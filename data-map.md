@@ -39,6 +39,10 @@
 - `ATTEMPT_HEADER` = `'x-attempt'`
 - `ERROR_HEADER` = `'x-error'`
 
+### `app/db.py`
+
+- `Sessions` = `async_sessionmaker[AsyncSession]`
+
 ### `app/gateway.py`
 
 - `SUCCESS_RATE` = `0.9`
@@ -80,14 +84,10 @@
   - `created_at: Mapped[datetime]` = `mapped_column(DateTime(timezone=True), server_de…`
   - `published_at: Mapped[datetime | None]` = `mapped_column(DateTime(timezone=True))`
 
-### `app/payments.py`
-
-- `Sessions` = `async_sessionmaker[AsyncSession]`
-
 ### `app/processing.py`
 
 - `class Processor`
-  - `session_factory: async_sessionmaker[AsyncSession]`
+  - `session_factory: Sessions`
   - `http: httpx.AsyncClient`
   - `rng: random.Random`
   - `sleep: Sleep` = `asyncio.sleep`

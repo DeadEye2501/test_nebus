@@ -1,4 +1,4 @@
-"""Обработка платежа: проведение через шлюз и отправка webhook."""
+"""Обработка платежа: проведение через шлюз с последующим webhook."""
 
 import asyncio
 import random
@@ -6,8 +6,8 @@ import uuid
 from dataclasses import dataclass
 
 import httpx
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.db import Sessions
 from app.gateway import Sleep, charge
 from app.payments import settle
 from app.schemas import PaymentDetail
@@ -16,7 +16,7 @@ from app.webhook import send
 
 @dataclass(frozen=True)
 class Processor:
-    session_factory: async_sessionmaker[AsyncSession]
+    session_factory: Sessions
     http: httpx.AsyncClient
     rng: random.Random
     sleep: Sleep = asyncio.sleep

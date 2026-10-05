@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import get_settings
 
+Sessions = async_sessionmaker[AsyncSession]
+
 
 @lru_cache
 def get_engine() -> AsyncEngine:
@@ -18,5 +20,5 @@ def get_engine() -> AsyncEngine:
 
 
 @lru_cache
-def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
+def get_sessionmaker() -> Sessions:
     return async_sessionmaker(get_engine(), expire_on_commit=False)

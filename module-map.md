@@ -16,13 +16,14 @@
 - `def require_api_key(key: str | None=Security(_api_key_header)) -> None` (3)
 - `def require_docs_credentials(credentials: Annotated[HTTPBasicCredentials | None, Depends(_basic)]) -> None` (10)
 
-### `app/api/main.py` — 39 строк
+### `app/api/main.py` — 44 строк
 
 Сборка приложения FastAPI: эндпоинты платежей и Swagger под Basic-аутентификацией.
 
 Зависит от: `app.api.auth`, `app.api.routes`
 
-- `async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse` (5)
+- `def _public_errors(errors: Sequence[Mapping]) -> list[dict]` (4)
+- `async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse` (2)
 - `def create_app() -> FastAPI` (18)
   - `async def openapi() -> dict` (2)
   - `async def swagger() -> HTMLResponse` (2)
@@ -45,13 +46,13 @@
 - `class Settings(BaseSettings)` (10)
 - `def get_settings() -> Settings` (2)
 
-### `app/consumer.py` — 93 строк
+### `app/consumer.py` — 95 строк
 
-Consumer очереди payments.new: проводит платёж, шлёт webhook, уводит сбои в повторы и DLQ.
+Consumer очереди payments.new: маршрутизация сообщения — обработка, повтор, DLQ.
 
 Зависит от: `app.config`, `app.db`, `app.processing`, `app.schemas`, `app.topology`
 
-- `async def handle(broker: RabbitBroker, processor: Processor, body: bytes, headers: dict) -> None` (17)
+- `async def handle(broker: RabbitBroker, processor: Processor, body: bytes, headers: dict) -> None` (19)
 - `async def _forward(broker: RabbitBroker, body: bytes, routing_key: str, headers: dict) -> None` (8)
 - `def _attempt(headers: dict) -> int` (5)
 - `def _describe(exc: Exception) -> str` (2)
@@ -60,14 +61,14 @@ Consumer очереди payments.new: проводит платёж, шлёт we
   - `async def declare_topology() -> None` (3)
 - `async def main() -> None` (6)
 
-### `app/db.py` — 22 строк
+### `app/db.py` — 24 строк
 
 Подключение к PostgreSQL: асинхронный движок и фабрика сессий.
 
 Зависит от: `app.config`
 
 - `def get_engine() -> AsyncEngine` (2)
-- `def get_sessionmaker() -> async_sessionmaker[AsyncSession]` (2)
+- `def get_sessionmaker() -> Sessions` (2)
 
 ### `app/gateway.py` — 18 строк
 
@@ -77,7 +78,7 @@ Consumer очереди payments.new: проводит платёж, шлёт we
 
 - `async def charge(rng: random.Random, sleep: Sleep=asyncio.sleep) -> PaymentStatus` (3)
 
-### `app/models.py` — 79 строк
+### `app/models.py` — 77 строк
 
 ORM-модели таблиц payments и outbox.
 
@@ -87,14 +88,14 @@ ORM-модели таблиц payments и outbox.
 - `class Currency(enum.StrEnum)` (4)
 - `class PaymentStatus(enum.StrEnum)` (4)
 - `def _db_enum(values: type[enum.StrEnum], name: str) -> Enum` (2)
-- `class Payment(Base)` (22)
+- `class Payment(Base)` (20)
 - `class OutboxEvent(Base)` (11)
 
-### `app/payments.py` — 97 строк
+### `app/payments.py` — 95 строк
 
 Операции с платежами в базе: создание, чтение, фиксация результата.
 
-Зависит от: `app.models`, `app.schemas`
+Зависит от: `app.db`, `app.models`, `app.schemas`
 
 - `class IdempotencyConflict(Exception)` (2)
 - `class PaymentNotFound(Exception)` (2)
@@ -108,21 +109,21 @@ ORM-модели таблиц payments и outbox.
 
 ### `app/processing.py` — 29 строк
 
-Обработка платежа: проведение через шлюз и отправка webhook.
+Обработка платежа: проведение через шлюз с последующим webhook.
 
-Зависит от: `app.gateway`, `app.payments`, `app.schemas`, `app.webhook`
+Зависит от: `app.db`, `app.gateway`, `app.payments`, `app.schemas`, `app.webhook`
 
 - `class Processor` (12)
   - `async def process(self, payment_id: uuid.UUID) -> None` (6)
 
-### `app/relay.py` — 61 строк
+### `app/relay.py` — 57 строк
 
-Relay outbox: публикует неопубликованные события в RabbitMQ и отмечает их.
+Relay outbox: перенос неопубликованных событий в RabbitMQ.
 
 Зависит от: `app.config`, `app.db`, `app.models`, `app.topology`
 
-- `async def publish_batch(session_factory: async_sessionmaker[AsyncSession], broker: RabbitBroker, limit: int) -> int` (18)
-- `async def run(session_factory: async_sessionmaker[AsyncSession], broker: RabbitBroker, settings: Settings) -> None` (11)
+- `async def publish_batch(session_factory: Sessions, broker: RabbitBroker, limit: int) -> int` (17)
+- `async def run(session_factory: Sessions, broker: RabbitBroker, settings: Settings) -> None` (9)
 - `async def main() -> None` (7)
 
 ### `app/schemas.py` — 91 строк
@@ -170,25 +171,25 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `def _run(connection: Connection) -> None` (4)
 - `async def _run_async() -> None` (5)
 
-### `migrations/versions/0001_payments_and_outbox.py` — 48 строк
+### `migrations/versions/0001_payments_and_outbox.py` — 56 строк
 
 Таблицы payments и outbox.
 
 Зависит от: —
 
-- `def upgrade() -> None` (31)
+- `def upgrade() -> None` (39)
 - `def downgrade() -> None` (5)
 
-## tests — 12 модулей
+## tests — 14 модулей
 
-### `tests/conftest.py` — 62 строк
+### `tests/conftest.py` — 64 строк
 
 Общие фикстуры: схема тестовой БД из миграций и чистые таблицы перед каждым тестом.
 
 Зависит от: `app.api.main`, `app.config`, `app.db`
 
 - `def pytest_collection_modifyitems(items: list[pytest.Item]) -> None` (7)
-- `async def _schema()` (11)
+- `async def _schema()` (13)
 - `async def _clean_tables(_schema)` (3)
 - `def session_factory()` (2)
 - `async def session(session_factory)` (3)
@@ -225,7 +226,7 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 Тестов: 4
 
 
-### `tests/test_api_payments.py` — 147 строк
+### `tests/test_api_payments.py` — 145 строк
 
 Проверки HTTP API платежей: создание, чтение, идемпотентность, ключ доступа и валидация.
 
@@ -235,17 +236,15 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 
 - `def _headers(idempotency_key: str='key-1') -> dict[str, str]` (2)
 
-### `tests/test_consumer.py` — 215 строк
+### `tests/test_consumer.py` — 156 строк
 
-Тесты consumer: обработка, повторы, DLQ и сборка платежа процессором.
+Тесты consumer: обработка, повторы и DLQ.
 
-Зависит от: `app.consumer`, `app.models`, `app.payments`, `app.processing`, `app.topology`, `app.webhook`, `tests.fakes`, `tests.helpers`
+Зависит от: `app.consumer`, `app.topology`, `app.webhook`, `tests.fakes`
 
-Тестов: 12
+Тестов: 9
 
 - `def _body(payment_id: uuid.UUID) -> bytes` (2)
-- `async def _no_wait(delay: float) -> None` (2)
-- `def _processor(session_factory, handler) -> Processor` (3)
 
 ### `tests/test_gateway.py` — 33 строк
 
@@ -258,7 +257,7 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `async def _run(times: int) -> tuple[list[float], list[PaymentStatus]]` (9)
   - `async def record(delay: float) -> None` (2)
 
-### `tests/test_payments.py` — 109 строк
+### `tests/test_payments.py` — 113 строк
 
 Тесты создания платежа с идемпотентностью и outbox и чтения платежа.
 
@@ -270,7 +269,18 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `def _miss_first_lookup(monkeypatch)` (10)
   - `async def find(session_factory, key)` (3)
 
-### `tests/test_relay.py` — 106 строк
+### `tests/test_processing.py` — 71 строк
+
+Тесты Processor: проведение платежа и отправка webhook.
+
+Зависит от: `app.models`, `app.payments`, `app.processing`, `tests.helpers`
+
+Тестов: 3
+
+- `async def _no_wait(delay: float) -> None` (2)
+- `def _processor(session_factory, handler) -> Processor` (3)
+
+### `tests/test_relay.py` — 104 строк
 
 Проверки relay: порядок, лимит, отметка опубликованных, сбой брокера и блокировки.
 
@@ -290,7 +300,7 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 Тестов: 5
 
 
-### `tests/test_settle.py` — 62 строк
+### `tests/test_settle.py` — 69 строк
 
 Тесты фиксации результата обработки платежа.
 
@@ -300,6 +310,15 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 
 - `def _gateway(outcome: PaymentStatus, calls: list[str])` (6)
   - `async def charge() -> PaymentStatus` (3)
+
+### `tests/test_topology.py` — 22 строк
+
+Тесты топологии RabbitMQ: TTL и dead-letter очередей повторов.
+
+Зависит от: `app.topology`
+
+Тестов: 2
+
 
 ### `tests/test_webhook.py` — 45 строк
 

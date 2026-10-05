@@ -30,15 +30,22 @@ async def test_pending_payment_gets_gateway_outcome_and_processing_time(session_
     assert settled.processed_at is not None
 
 
-async def test_final_payment_is_not_charged_again(session_factory):
+@pytest.mark.parametrize(
+    ("outcome", "other"),
+    [
+        (PaymentStatus.SUCCEEDED, PaymentStatus.FAILED),
+        (PaymentStatus.FAILED, PaymentStatus.SUCCEEDED),
+    ],
+)
+async def test_final_payment_is_not_charged_again(session_factory, outcome, other):
     created = await create_payment(session_factory, "key-1", payment_body())
-    first = await settle(session_factory, created.id, _gateway(PaymentStatus.SUCCEEDED, []))
+    first = await settle(session_factory, created.id, _gateway(outcome, []))
     calls: list[str] = []
 
-    second = await settle(session_factory, created.id, _gateway(PaymentStatus.FAILED, calls))
+    second = await settle(session_factory, created.id, _gateway(other, calls))
 
     assert calls == []
-    assert second.status is PaymentStatus.SUCCEEDED
+    assert second.status is outcome
     assert second.processed_at == first.processed_at
 
 

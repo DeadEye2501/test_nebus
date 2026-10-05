@@ -7,12 +7,10 @@ from collections.abc import Awaitable, Callable
 
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.db import Sessions
 from app.models import OutboxEvent, Payment, PaymentStatus
 from app.schemas import NewPaymentEvent, PaymentCreate
-
-Sessions = async_sessionmaker[AsyncSession]
 
 
 class IdempotencyConflict(Exception):

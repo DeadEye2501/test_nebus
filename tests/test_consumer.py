@@ -1,31 +1,21 @@
-"""Тесты consumer: обработка, повторы, DLQ и сборка платежа процессором."""
+"""Тесты consumer: обработка, повторы и DLQ."""
 
 import json
-import random
 import uuid
 
-import httpx
 import pytest
 from faststream.exceptions import NackMessage
 from faststream.rabbit import RabbitQueue, TestRabbitBroker
 from faststream.rabbit.annotations import RabbitMessage
 
 from app.consumer import create_app, handle
-from app.models import PaymentStatus
-from app.payments import create_payment, get_payment
-from app.processing import Processor
 from app.topology import DLQ_KEY, EXCHANGE, NEW_KEY, retry_key
 from app.webhook import WebhookError
 from tests.fakes import FailingBroker, RecordingBroker, StubProcessor
-from tests.helpers import payment_body
 
 
 def _body(payment_id: uuid.UUID) -> bytes:
     return json.dumps({"payment_id": str(payment_id)}).encode()
-
-
-async def _no_wait(delay: float) -> None:
-    return None
 
 
 async def test_successful_processing_publishes_nothing():
@@ -52,6 +42,8 @@ async def test_failure_goes_to_next_retry_queue(headers, route, next_attempt):
     assert message == body
     assert options["routing_key"] == route
     assert options["headers"]["x-attempt"] == next_attempt
+    assert options["persist"] is True
+    assert options["exchange"] is EXCHANGE
 
 
 async def test_third_failure_goes_to_dlq_with_error():
@@ -64,6 +56,8 @@ async def test_third_failure_goes_to_dlq_with_error():
     assert message == body
     assert options["routing_key"] == DLQ_KEY
     assert options["headers"]["x-error"] == "RuntimeError: boom"
+    assert options["persist"] is True
+    assert options["exchange"] is EXCHANGE
 
 
 @pytest.mark.parametrize("body", [b"not json", b'{"payment_id": "nope"}', b"[]"])
@@ -86,7 +80,7 @@ async def test_failed_forward_nacks_original_message():
     assert raised.value.extra_options == {"requeue": True}
 
 
-@pytest.mark.parametrize("attempt", ["abc", 0, -1])
+@pytest.mark.parametrize("attempt", ["abc", 0, -1, None, [1]])
 async def test_invalid_attempt_header_goes_straight_to_dlq(attempt):
     body = _body(uuid.uuid4())
     broker, processor = RecordingBroker(), StubProcessor()
@@ -97,7 +91,7 @@ async def test_invalid_attempt_header_goes_straight_to_dlq(attempt):
     [(message, options)] = broker.published
     assert message == body
     assert options["routing_key"] == DLQ_KEY
-    assert "ValueError" in options["headers"]["x-error"]
+    assert "Error" in options["headers"]["x-error"]
 
 
 async def test_message_from_payments_new_reaches_processor_and_failure_reaches_retry_queue():
@@ -111,7 +105,9 @@ async def test_message_from_payments_new_reaches_processor_and_failure_reaches_r
         retried.append(message.headers.get("x-attempt"))
 
     async with TestRabbitBroker(app.broker) as broker:
-        await broker.publish({"payment_id": str(payment_id)}, exchange=EXCHANGE, routing_key=NEW_KEY)
+        await broker.publish(
+            {"payment_id": str(payment_id)}, exchange=EXCHANGE, routing_key=NEW_KEY
+        )
 
     assert processor.calls == [payment_id]
     assert retried == [2]
@@ -158,58 +154,3 @@ async def test_startup_connects_broker_and_declares_topology(monkeypatch):
         pass
 
     assert events == ["connect", ("declare", app.broker, 3.5)]
-
-
-def _processor(session_factory, handler) -> Processor:
-    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return Processor(session_factory, http, random.Random(0), _no_wait)
-
-
-async def test_processor_settles_payment_and_sends_its_state(session_factory):
-    created = await create_payment(session_factory, "key-1", payment_body())
-    hooks = []
-
-    def receiver(request: httpx.Request) -> httpx.Response:
-        hooks.append((str(request.url), json.loads(request.content)))
-        return httpx.Response(200)
-
-    await _processor(session_factory, receiver).process(created.id)
-
-    stored = await get_payment(session_factory, created.id)
-    assert stored.status is not PaymentStatus.PENDING
-    [(url, body)] = hooks
-    assert url == "https://example.com/hook"
-    assert body["payment_id"] == str(created.id)
-    assert body["status"] == stored.status.value
-
-
-async def test_redelivery_resends_webhook_without_charging_again(session_factory):
-    created = await create_payment(session_factory, "key-1", payment_body())
-    hooks = []
-
-    def receiver(request: httpx.Request) -> httpx.Response:
-        hooks.append(json.loads(request.content))
-        return httpx.Response(200)
-
-    processor = _processor(session_factory, receiver)
-    await processor.process(created.id)
-    first = await get_payment(session_factory, created.id)
-    await processor.process(created.id)
-    second = await get_payment(session_factory, created.id)
-
-    assert len(hooks) == 2
-    assert second.processed_at == first.processed_at
-    assert hooks[0] == hooks[1]
-
-
-async def test_unreachable_webhook_raises_after_payment_is_settled(session_factory):
-    created = await create_payment(session_factory, "key-1", payment_body())
-
-    def refuse(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("отказ в соединении", request=request)
-
-    with pytest.raises(httpx.ConnectError):
-        await _processor(session_factory, refuse).process(created.id)
-
-    stored = await get_payment(session_factory, created.id)
-    assert stored.status is not PaymentStatus.PENDING

@@ -28,7 +28,9 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 async def _schema():
     database = make_url(get_settings().database_url).database
     if not (database or "").endswith("_test"):
-        pytest.exit(f"Тесты стирают схему; база {database!r} не оканчивается на _test", returncode=2)
+        pytest.exit(
+            f"Тесты стирают схему; база {database!r} не оканчивается на _test", returncode=2
+        )
     async with get_engine().begin() as connection:
         await connection.execute(text("DROP SCHEMA public CASCADE"))
         await connection.execute(text("CREATE SCHEMA public"))

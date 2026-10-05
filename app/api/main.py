@@ -1,5 +1,7 @@
 """Сборка приложения FastAPI: эндпоинты платежей и Swagger под Basic-аутентификацией."""
 
+from collections.abc import Mapping, Sequence
+
 from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -9,11 +11,14 @@ from app.api.auth import require_docs_credentials
 from app.api.routes import router
 
 
-async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+def _public_errors(errors: Sequence[Mapping]) -> list[dict]:
     # Стандартный ответ повторяет входное значение; NaN/Infinity из тела запроса
     # JSON-ом не сериализуются и превращали бы 422 в 500.
-    detail = [{key: error[key] for key in ("type", "loc", "msg")} for error in exc.errors()]
-    return JSONResponse({"detail": detail}, status_code=422)
+    return [{key: error[key] for key in ("type", "loc", "msg")} for error in errors]
+
+
+async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse({"detail": _public_errors(exc.errors())}, status_code=422)
 
 
 def create_app() -> FastAPI:
