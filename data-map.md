@@ -6,10 +6,27 @@
 
 ## app
 
+### `app/api/auth.py`
+
+- `_api_key_header` = `APIKeyHeader(name='X-API-Key', auto_error=False)`
+- `_basic` = `HTTPBasic(auto_error=False)`
+- `_BASIC_CHALLENGE` = `словарь из 1`
+
+### `app/api/main.py`
+
+- `app` = `create_app()`
+
+### `app/api/routes.py`
+
+- `router` = `APIRouter(prefix='/api/v1/payments', dependencie…`
+
 ### `app/config.py`
 
 - `class Settings(BaseSettings)`
   - `database_url: str`
+  - `api_key: str`
+  - `docs_username: str`
+  - `docs_password: str`
 
 ### `app/models.py`
 
@@ -87,3 +104,14 @@
 
 - `revision` = `'0001'`
 - `down_revision` = `None`
+
+## tests
+
+### `tests/test_api_docs.py`
+
+- `DOCS_AUTH` = `набор из 2`
+
+### `tests/test_api_payments.py`
+
+- `KEY` = `словарь из 1`
+- `BODY` = `словарь из 5`

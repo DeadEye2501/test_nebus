@@ -4,15 +4,45 @@
 Править руками нельзя — правки затрёт следующая сборка.
 Число в скобках — сколько строк занимает объявление.
 
-## app — 5 модулей
+## app — 8 модулей
 
-### `app/config.py` — 14 строк
+### `app/api/auth.py` — 34 строк
+
+Проверка доступа: ключ X-API-Key для API и Basic-аутентификация для Swagger.
+
+Зависит от: `app.config`
+
+- `def _same(given: str, expected: str) -> bool` (2)
+- `def require_api_key(key: str | None=Security(_api_key_header)) -> None` (3)
+- `def require_docs_credentials(credentials: Annotated[HTTPBasicCredentials | None, Depends(_basic)]) -> None` (10)
+
+### `app/api/main.py` — 39 строк
+
+Сборка приложения FastAPI: эндпоинты платежей и Swagger под Basic-аутентификацией.
+
+Зависит от: `app.api.auth`, `app.api.routes`
+
+- `async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse` (5)
+- `def create_app() -> FastAPI` (18)
+  - `async def openapi() -> dict` (2)
+  - `async def swagger() -> HTMLResponse` (2)
+
+### `app/api/routes.py` — 35 строк
+
+Эндпоинты /api/v1/payments: создание и чтение платежа.
+
+Зависит от: `app.api.auth`, `app.db`, `app.payments`, `app.schemas`
+
+- `async def create(body: PaymentCreate, idempotency_key: Annotated[str, Header(min_length=1, max_length=255)]) -> PaymentAccepted` (11)
+- `async def read(payment_id: uuid.UUID) -> PaymentDetail` (5)
+
+### `app/config.py` — 17 строк
 
 Настройки сервиса из переменных окружения.
 
 Зависит от: —
 
-- `class Settings(BaseSettings)` (2)
+- `class Settings(BaseSettings)` (5)
 - `def get_settings() -> Settings` (2)
 
 ### `app/db.py` — 22 строк
@@ -50,14 +80,16 @@ ORM-модели таблиц payments и outbox.
 - `async def _find_by_key(session_factory: Sessions, key: str) -> Payment | None` (3)
 - `async def _insert(session_factory: Sessions, key: str, body: PaymentCreate, digest: str) -> Payment` (15)
 
-### `app/schemas.py` — 68 строк
+### `app/schemas.py` — 91 строк
 
 Pydantic-схемы: тело запроса на платёж, ответы API и событие о новом платеже.
 
 Зависит от: `app.models`
 
-- `class PaymentCreate(BaseModel)` (11)
+- `def _check_postgres_safe(value: Any) -> None` (14)
+- `class PaymentCreate(BaseModel)` (17)
   - `def _to_cents(cls, value: Decimal) -> Decimal` (2)
+  - `def _postgres_safe(cls, value: Any) -> Any` (3)
 - `class PaymentAccepted(BaseModel)` (6)
 - `class PaymentDetail(BaseModel)` (13)
 - `class NewPaymentEvent(BaseModel)` (2)
@@ -82,19 +114,20 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `def upgrade() -> None` (31)
 - `def downgrade() -> None` (5)
 
-## tests — 4 модулей
+## tests — 6 модулей
 
-### `tests/conftest.py` — 53 строк
+### `tests/conftest.py` — 62 строк
 
 Общие фикстуры: схема тестовой БД из миграций и чистые таблицы перед каждым тестом.
 
-Зависит от: `app.config`, `app.db`
+Зависит от: `app.api.main`, `app.config`, `app.db`
 
 - `def pytest_collection_modifyitems(items: list[pytest.Item]) -> None` (7)
 - `async def _schema()` (11)
 - `async def _clean_tables(_schema)` (3)
 - `def session_factory()` (2)
 - `async def session(session_factory)` (3)
+- `async def client()` (4)
 
 ### `tests/helpers.py` — 32 строк
 
@@ -104,6 +137,25 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 
 - `def payment_row(**overrides) -> Payment` (12)
 - `def payment_body(**overrides) -> PaymentCreate` (9)
+
+### `tests/test_api_docs.py` — 37 строк
+
+Проверки Swagger: доступ только под Basic, схема с X-API-Key, ReDoc не опубликован.
+
+Зависит от: —
+
+Тестов: 4
+
+
+### `tests/test_api_payments.py` — 147 строк
+
+Проверки HTTP API платежей: создание, чтение, идемпотентность, ключ доступа и валидация.
+
+Зависит от: —
+
+Тестов: 11
+
+- `def _headers(idempotency_key: str='key-1') -> dict[str, str]` (2)
 
 ### `tests/test_payments.py` — 109 строк
 

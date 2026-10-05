@@ -5,6 +5,9 @@ pythonpath = ["."]
 testpaths = ["tests"]
 env = [
   "D:DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/payments_test",
+  "API_KEY=test-key",
+  "DOCS_USERNAME=docs",
+  "DOCS_PASSWORD=docs-secret",
 ]
 
 [tool.ruff]

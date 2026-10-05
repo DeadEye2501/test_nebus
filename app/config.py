@@ -7,6 +7,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     database_url: str
+    api_key: str
+    docs_username: str
+    docs_password: str
 
 
 @lru_cache

@@ -1,5 +1,6 @@
 """Pydantic-схемы: тело запроса на платёж, ответы API и событие о новом платеже."""
 
+import math
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -28,6 +29,22 @@ PaymentId = Annotated[uuid.UUID, Field(validation_alias=AliasChoices("id", "paym
 Metadata = Annotated[dict[str, Any], Field(validation_alias=AliasChoices("meta", "metadata"))]
 
 
+def _check_postgres_safe(value: Any) -> None:
+    # Postgres не хранит NUL в text/jsonb и не принимает NaN/Infinity в jsonb:
+    # без проверки такой ввод дошёл бы до БД и вернулся бы как 500.
+    if isinstance(value, str) and "\x00" in value:
+        raise ValueError("NUL-символ не допускается")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError("NaN и Infinity не допускаются")
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _check_postgres_safe(key)
+            _check_postgres_safe(item)
+    elif isinstance(value, list):
+        for item in value:
+            _check_postgres_safe(item)
+
+
 class PaymentCreate(BaseModel):
     amount: Annotated[Decimal, Field(gt=0, max_digits=18, decimal_places=2)]
     currency: Currency
@@ -39,6 +56,12 @@ class PaymentCreate(BaseModel):
     @classmethod
     def _to_cents(cls, value: Decimal) -> Decimal:
         return value.quantize(CENT)
+
+    @field_validator("description", "metadata")
+    @classmethod
+    def _postgres_safe(cls, value: Any) -> Any:
+        _check_postgres_safe(value)
+        return value
 
 
 class PaymentAccepted(BaseModel):

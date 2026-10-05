@@ -4,11 +4,13 @@ import asyncio
 import subprocess
 import sys
 
+import httpx
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 
+from app.api.main import app
 from app.config import get_settings
 from app.db import get_engine, get_sessionmaker
 
@@ -50,4 +52,11 @@ def session_factory():
 @pytest.fixture
 async def session(session_factory):
     async with session_factory() as opened:
+        yield opened
+
+
+@pytest.fixture
+async def client():
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as opened:
         yield opened
