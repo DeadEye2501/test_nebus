@@ -1,0 +1,24 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+pydantic = ">=2"
+pydantic-settings = "*"
+sqlalchemy = {extras = ["asyncio"], version = ">=2.0"}
+asyncpg = "*"
+alembic = "*"
+faststream = {extras = ["rabbit"], version = "*"}
+httpx = "*"
+
+[dev-packages]
+pytest = "*"
+pytest-asyncio = ">=0.24"
+pytest-env = "*"
+ruff = "*"
+
+[requires]
+python_version = "3.13"
