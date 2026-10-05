@@ -27,6 +27,10 @@
   - `api_key: str`
   - `docs_username: str`
   - `docs_password: str`
+  - `rabbitmq_url: str`
+  - `outbox_batch_size: int` = `100`
+  - `outbox_poll_interval: float` = `1.0`
+  - `retry_base_delay: float` = `2.0`
 
 ### `app/models.py`
 
@@ -66,6 +70,10 @@
 
 - `Sessions` = `async_sessionmaker[AsyncSession]`
 
+### `app/relay.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `app/schemas.py`
 
 - `CENT` = `Decimal('0.01')`
@@ -97,6 +105,14 @@
   - `processed_at: datetime | None`
 - `class NewPaymentEvent(BaseModel)`
   - `payment_id: uuid.UUID`
+
+### `app/topology.py`
+
+- `MAX_ATTEMPTS` = `3`
+- `EXCHANGE` = `RabbitExchange('payments', type=ExchangeType.DIR…`
+- `NEW_KEY` = `'payments.new'`
+- `DLQ_KEY` = `'payments.new.dlq'`
+- `NEW_QUEUE` = `RabbitQueue(NEW_KEY, durable=True)`
 
 ## migrations
 

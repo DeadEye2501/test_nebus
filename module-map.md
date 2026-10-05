@@ -4,7 +4,7 @@
 Править руками нельзя — правки затрёт следующая сборка.
 Число в скобках — сколько строк занимает объявление.
 
-## app — 8 модулей
+## app — 10 модулей
 
 ### `app/api/auth.py` — 34 строк
 
@@ -36,13 +36,13 @@
 - `async def create(body: PaymentCreate, idempotency_key: Annotated[str, Header(min_length=1, max_length=255)]) -> PaymentAccepted` (11)
 - `async def read(payment_id: uuid.UUID) -> PaymentDetail` (5)
 
-### `app/config.py` — 17 строк
+### `app/config.py` — 21 строк
 
 Настройки сервиса из переменных окружения.
 
 Зависит от: —
 
-- `class Settings(BaseSettings)` (5)
+- `class Settings(BaseSettings)` (9)
 - `def get_settings() -> Settings` (2)
 
 ### `app/db.py` — 22 строк
@@ -80,6 +80,16 @@ ORM-модели таблиц payments и outbox.
 - `async def _find_by_key(session_factory: Sessions, key: str) -> Payment | None` (3)
 - `async def _insert(session_factory: Sessions, key: str, body: PaymentCreate, digest: str) -> Payment` (15)
 
+### `app/relay.py` — 63 строк
+
+Relay outbox: публикует неопубликованные события в RabbitMQ и отмечает их.
+
+Зависит от: `app.config`, `app.db`, `app.models`, `app.topology`
+
+- `async def publish_batch(session_factory: async_sessionmaker[AsyncSession], broker: RabbitBroker, limit: int) -> int` (18)
+- `async def run(session_factory: async_sessionmaker[AsyncSession], broker: RabbitBroker, settings: Settings) -> None` (11)
+- `async def main() -> None` (9)
+
 ### `app/schemas.py` — 91 строк
 
 Pydantic-схемы: тело запроса на платёж, ответы API и событие о новом платеже.
@@ -93,6 +103,16 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `class PaymentAccepted(BaseModel)` (6)
 - `class PaymentDetail(BaseModel)` (13)
 - `class NewPaymentEvent(BaseModel)` (2)
+
+### `app/topology.py` — 35 строк
+
+Топология RabbitMQ: обменник платежей, рабочая очередь, очереди повторов и DLQ.
+
+Зависит от: —
+
+- `def retry_key(attempt: int) -> str` (2)
+- `def _retry_queue(attempt: int, base_delay: float) -> RabbitQueue` (12)
+- `async def declare(broker: RabbitBroker, base_delay: float) -> None` (6)
 
 ## migrations — 2 модулей
 
@@ -114,7 +134,7 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `def upgrade() -> None` (31)
 - `def downgrade() -> None` (5)
 
-## tests — 6 модулей
+## tests — 8 модулей
 
 ### `tests/conftest.py` — 62 строк
 
@@ -128,6 +148,17 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `def session_factory()` (2)
 - `async def session(session_factory)` (3)
 - `async def client()` (4)
+
+### `tests/fakes.py` — 14 строк
+
+Фейковые брокеры для тестов публикации.
+
+Зависит от: —
+
+- `class RecordingBroker` (6)
+  - `async def publish(self, message: object, **options) -> None` (2)
+- `class FailingBroker` (3)
+  - `async def publish(self, message: object, **options) -> None` (2)
 
 ### `tests/helpers.py` — 32 строк
 
@@ -168,6 +199,17 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `async def _count(session_factory, model) -> int` (3)
 - `def _miss_first_lookup(monkeypatch)` (10)
   - `async def find(session_factory, key)` (3)
+
+### `tests/test_relay.py` — 106 строк
+
+Проверки relay: порядок, лимит, отметка опубликованных, сбой брокера и блокировки.
+
+Зависит от: `app.models`, `app.relay`, `app.topology`, `tests.fakes`
+
+Тестов: 6
+
+- `async def _add_events(session_factory, payloads: list[dict]) -> None` (5)
+- `async def _unpublished(session_factory) -> int` (5)
 
 ### `tests/test_schema.py` — 59 строк
 

@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     api_key: str
     docs_username: str
     docs_password: str
+    rabbitmq_url: str
+    outbox_batch_size: int = 100
+    outbox_poll_interval: float = 1.0
+    retry_base_delay: float = 2.0
 
 
 @lru_cache
