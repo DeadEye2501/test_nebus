@@ -4,7 +4,7 @@
 Править руками нельзя — правки затрёт следующая сборка.
 Число в скобках — сколько строк занимает объявление.
 
-## app — 3 модулей
+## app — 5 модулей
 
 ### `app/config.py` — 14 строк
 
@@ -37,6 +37,31 @@ ORM-модели таблиц payments и outbox.
 - `class Payment(Base)` (22)
 - `class OutboxEvent(Base)` (11)
 
+### `app/payments.py` — 65 строк
+
+Операции с платежами в базе: создание с идемпотентностью и событием outbox, чтение.
+
+Зависит от: `app.models`, `app.schemas`
+
+- `class IdempotencyConflict(Exception)` (2)
+- `def request_hash(body: PaymentCreate) -> str` (3)
+- `async def get_payment(session_factory: Sessions, payment_id: uuid.UUID) -> Payment | None` (3)
+- `async def create_payment(session_factory: Sessions, key: str, body: PaymentCreate) -> Payment` (13)
+- `async def _find_by_key(session_factory: Sessions, key: str) -> Payment | None` (3)
+- `async def _insert(session_factory: Sessions, key: str, body: PaymentCreate, digest: str) -> Payment` (15)
+
+### `app/schemas.py` — 68 строк
+
+Pydantic-схемы: тело запроса на платёж, ответы API и событие о новом платеже.
+
+Зависит от: `app.models`
+
+- `class PaymentCreate(BaseModel)` (11)
+  - `def _to_cents(cls, value: Decimal) -> Decimal` (2)
+- `class PaymentAccepted(BaseModel)` (6)
+- `class PaymentDetail(BaseModel)` (13)
+- `class NewPaymentEvent(BaseModel)` (2)
+
 ## migrations — 2 модулей
 
 ### `migrations/env.py` — 25 строк
@@ -57,7 +82,7 @@ ORM-модели таблиц payments и outbox.
 - `def upgrade() -> None` (31)
 - `def downgrade() -> None` (5)
 
-## tests — 3 модулей
+## tests — 4 модулей
 
 ### `tests/conftest.py` — 53 строк
 
@@ -71,13 +96,26 @@ ORM-модели таблиц payments и outbox.
 - `def session_factory()` (2)
 - `async def session(session_factory)` (3)
 
-### `tests/helpers.py` — 20 строк
+### `tests/helpers.py` — 32 строк
 
 Построители тестовых данных.
 
-Зависит от: `app.models`
+Зависит от: `app.models`, `app.schemas`
 
 - `def payment_row(**overrides) -> Payment` (12)
+- `def payment_body(**overrides) -> PaymentCreate` (9)
+
+### `tests/test_payments.py` — 109 строк
+
+Тесты создания платежа с идемпотентностью и outbox и чтения платежа.
+
+Зависит от: `app`, `app.models`, `app.payments`, `tests.helpers`
+
+Тестов: 8
+
+- `async def _count(session_factory, model) -> int` (3)
+- `def _miss_first_lookup(monkeypatch)` (10)
+  - `async def find(session_factory, key)` (3)
 
 ### `tests/test_schema.py` — 59 строк
 

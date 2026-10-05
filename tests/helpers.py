@@ -4,6 +4,7 @@ import uuid
 from decimal import Decimal
 
 from app.models import Currency, Payment
+from app.schemas import PaymentCreate
 
 
 def payment_row(**overrides) -> Payment:
@@ -18,3 +19,14 @@ def payment_row(**overrides) -> Payment:
         "webhook_url": "https://example.com/hook",
     } | overrides
     return Payment(**fields)
+
+
+def payment_body(**overrides) -> PaymentCreate:
+    fields = {
+        "amount": "100.50",
+        "currency": "RUB",
+        "description": "Заказ 42",
+        "metadata": {"order_id": 42, "source": "web"},
+        "webhook_url": "https://example.com/hook",
+    } | overrides
+    return PaymentCreate.model_validate(fields)

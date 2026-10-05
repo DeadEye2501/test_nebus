@@ -45,6 +45,42 @@
   - `created_at: Mapped[datetime]` = `mapped_column(DateTime(timezone=True), server_de…`
   - `published_at: Mapped[datetime | None]` = `mapped_column(DateTime(timezone=True))`
 
+### `app/payments.py`
+
+- `Sessions` = `async_sessionmaker[AsyncSession]`
+
+### `app/schemas.py`
+
+- `CENT` = `Decimal('0.01')`
+- `WebhookUrl` = `Annotated[AnyUrl, UrlConstraints(max_length=2048…`
+- `PaymentId` = `Annotated[uuid.UUID, Field(validation_alias=Alia…`
+- `Metadata` = `Annotated[dict[str, Any], Field(validation_alias…`
+- `class PaymentCreate(BaseModel)`
+  - `amount: Annotated[Decimal, Field(gt=0, max_digits=18, decimal_places=2)]`
+  - `currency: Currency`
+  - `description: Annotated[str, Field(min_length=1, max_length=500)]`
+  - `metadata: dict[str, Any]` = `Field(default_factory=dict)`
+  - `webhook_url: WebhookUrl`
+- `class PaymentAccepted(BaseModel)`
+  - `model_config` = `ConfigDict(from_attributes=True)`
+  - `payment_id: PaymentId`
+  - `status: PaymentStatus`
+  - `created_at: datetime`
+- `class PaymentDetail(BaseModel)`
+  - `model_config` = `ConfigDict(from_attributes=True)`
+  - `payment_id: PaymentId`
+  - `amount: Decimal`
+  - `currency: Currency`
+  - `description: str`
+  - `metadata: Metadata`
+  - `status: PaymentStatus`
+  - `idempotency_key: str`
+  - `webhook_url: str`
+  - `created_at: datetime`
+  - `processed_at: datetime | None`
+- `class NewPaymentEvent(BaseModel)`
+  - `payment_id: uuid.UUID`
+
 ## migrations
 
 ### `migrations/versions/0001_payments_and_outbox.py`
