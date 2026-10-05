@@ -1,0 +1,68 @@
+x-app: &app
+  build: .
+  environment:
+    DATABASE_URL: postgresql+asyncpg://payments:payments@postgres:5432/payments
+    RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    API_KEY: ${API_KEY:-dev-api-key}
+    DOCS_USERNAME: ${DOCS_USERNAME:-docs}
+    DOCS_PASSWORD: ${DOCS_PASSWORD:-docs-password}
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: payments
+      POSTGRES_PASSWORD: payments
+      POSTGRES_DB: payments
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U payments -d payments"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    <<: *app
+    command: alembic upgrade head
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  relay:
+    <<: *app
+    command: python -m app.relay
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
+  consumer:
+    <<: *app
+    command: python -m app.consumer
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
