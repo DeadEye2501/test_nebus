@@ -4,7 +4,7 @@
 Править руками нельзя — правки затрёт следующая сборка.
 Число в скобках — сколько строк занимает объявление.
 
-## app — 10 модулей
+## app — 12 модулей
 
 ### `app/api/auth.py` — 34 строк
 
@@ -53,6 +53,14 @@
 
 - `def get_engine() -> AsyncEngine` (2)
 - `def get_sessionmaker() -> async_sessionmaker[AsyncSession]` (2)
+
+### `app/gateway.py` — 18 строк
+
+Эмуляция внешнего платёжного шлюза.
+
+Зависит от: `app.models`
+
+- `async def charge(rng: random.Random, sleep: Sleep=asyncio.sleep) -> PaymentStatus` (3)
 
 ### `app/models.py` — 79 строк
 
@@ -114,6 +122,15 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `def _retry_queue(attempt: int, base_delay: float) -> RabbitQueue` (12)
 - `async def declare(broker: RabbitBroker, base_delay: float) -> None` (6)
 
+### `app/webhook.py` — 13 строк
+
+Отправка webhook-уведомления о результате платежа.
+
+Зависит от: —
+
+- `class WebhookError(Exception)` (2)
+- `async def send(client: httpx.AsyncClient, url: str, body: dict) -> None` (4)
+
 ## migrations — 2 модулей
 
 ### `migrations/env.py` — 25 строк
@@ -134,7 +151,7 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `def upgrade() -> None` (31)
 - `def downgrade() -> None` (5)
 
-## tests — 8 модулей
+## tests — 10 модулей
 
 ### `tests/conftest.py` — 62 строк
 
@@ -188,6 +205,17 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 
 - `def _headers(idempotency_key: str='key-1') -> dict[str, str]` (2)
 
+### `tests/test_gateway.py` — 33 строк
+
+Тестирование эмуляции платёжного шлюза.
+
+Зависит от: `app.gateway`, `app.models`
+
+Тестов: 2
+
+- `async def _run(times: int) -> tuple[list[float], list[PaymentStatus]]` (9)
+  - `async def record(delay: float) -> None` (2)
+
 ### `tests/test_payments.py` — 109 строк
 
 Тесты создания платежа с идемпотентностью и outbox и чтения платежа.
@@ -219,6 +247,16 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 
 Тестов: 5
 
+
+### `tests/test_webhook.py` — 45 строк
+
+Тестирование отправки webhook-уведомления о результате платежа.
+
+Зависит от: `app.webhook`
+
+Тестов: 3
+
+- `def _client(handler) -> httpx.AsyncClient` (2)
 
 ## Абстракции с одной реализацией
 

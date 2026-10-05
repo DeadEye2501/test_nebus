@@ -32,6 +32,13 @@
   - `outbox_poll_interval: float` = `1.0`
   - `retry_base_delay: float` = `2.0`
 
+### `app/gateway.py`
+
+- `SUCCESS_RATE` = `0.9`
+- `MIN_DELAY` = `2.0`
+- `MAX_DELAY` = `5.0`
+- `Sleep` = `Callable[[float], Awaitable[None]]`
+
 ### `app/models.py`
 
 - `class Currency(enum.StrEnum)`
@@ -131,3 +138,7 @@
 
 - `KEY` = `словарь из 1`
 - `BODY` = `словарь из 5`
+
+### `tests/test_webhook.py`
+
+- `URL` = `'https://example.com/hook'`
