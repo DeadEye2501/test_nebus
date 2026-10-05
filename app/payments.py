@@ -1,14 +1,15 @@
-"""Операции с платежами в базе: создание с идемпотентностью и событием outbox, чтение."""
+"""Операции с платежами в базе: создание, чтение, фиксация результата."""
 
 import hashlib
 import json
 import uuid
+from collections.abc import Awaitable, Callable
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models import OutboxEvent, Payment
+from app.models import OutboxEvent, Payment, PaymentStatus
 from app.schemas import NewPaymentEvent, PaymentCreate
 
 Sessions = async_sessionmaker[AsyncSession]
@@ -16,6 +17,10 @@ Sessions = async_sessionmaker[AsyncSession]
 
 class IdempotencyConflict(Exception):
     """Ключ идемпотентности уже использован с другим телом запроса."""
+
+
+class PaymentNotFound(Exception):
+    """Платежа с таким id нет в базе."""
 
 
 def request_hash(body: PaymentCreate) -> str:
@@ -62,4 +67,31 @@ async def _insert(session_factory: Sessions, key: str, body: PaymentCreate, dige
     event = OutboxEvent(payload=NewPaymentEvent(payment_id=payment.id).model_dump(mode="json"))
     async with session_factory() as session, session.begin():
         session.add_all([payment, event])
+    return payment
+
+
+async def settle(
+    session_factory: Sessions,
+    payment_id: uuid.UUID,
+    charge: Callable[[], Awaitable[PaymentStatus]],
+) -> Payment:
+    payment = await _require(session_factory, payment_id)
+    if payment.status is not PaymentStatus.PENDING:
+        return payment
+    # Транзакция не держится открытой на время ответа шлюза: результат пишется
+    # условным апдейтом, и если платёж уже провёл другой обработчик, побеждает он.
+    outcome = await charge()
+    async with session_factory() as session, session.begin():
+        await session.execute(
+            update(Payment)
+            .where(Payment.id == payment_id, Payment.status == PaymentStatus.PENDING)
+            .values(status=outcome, processed_at=func.now())
+        )
+    return await _require(session_factory, payment_id)
+
+
+async def _require(session_factory: Sessions, payment_id: uuid.UUID) -> Payment:
+    payment = await get_payment(session_factory, payment_id)
+    if payment is None:
+        raise PaymentNotFound(payment_id)
     return payment

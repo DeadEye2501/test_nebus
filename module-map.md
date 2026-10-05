@@ -75,18 +75,21 @@ ORM-модели таблиц payments и outbox.
 - `class Payment(Base)` (22)
 - `class OutboxEvent(Base)` (11)
 
-### `app/payments.py` — 65 строк
+### `app/payments.py` — 97 строк
 
-Операции с платежами в базе: создание с идемпотентностью и событием outbox, чтение.
+Операции с платежами в базе: создание, чтение, фиксация результата.
 
 Зависит от: `app.models`, `app.schemas`
 
 - `class IdempotencyConflict(Exception)` (2)
+- `class PaymentNotFound(Exception)` (2)
 - `def request_hash(body: PaymentCreate) -> str` (3)
 - `async def get_payment(session_factory: Sessions, payment_id: uuid.UUID) -> Payment | None` (3)
 - `async def create_payment(session_factory: Sessions, key: str, body: PaymentCreate) -> Payment` (13)
 - `async def _find_by_key(session_factory: Sessions, key: str) -> Payment | None` (3)
 - `async def _insert(session_factory: Sessions, key: str, body: PaymentCreate, digest: str) -> Payment` (15)
+- `async def settle(session_factory: Sessions, payment_id: uuid.UUID, charge: Callable[[], Awaitable[PaymentStatus]]) -> Payment` (18)
+- `async def _require(session_factory: Sessions, payment_id: uuid.UUID) -> Payment` (5)
 
 ### `app/relay.py` — 63 строк
 
@@ -151,7 +154,7 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 - `def upgrade() -> None` (31)
 - `def downgrade() -> None` (5)
 
-## tests — 10 модулей
+## tests — 11 модулей
 
 ### `tests/conftest.py` — 62 строк
 
@@ -247,6 +250,17 @@ Pydantic-схемы: тело запроса на платёж, ответы API
 
 Тестов: 5
 
+
+### `tests/test_settle.py` — 62 строк
+
+Тесты фиксации результата обработки платежа.
+
+Зависит от: `app.models`, `app.payments`, `tests.helpers`
+
+Тестов: 4
+
+- `def _gateway(outcome: PaymentStatus, calls: list[str])` (6)
+  - `async def charge() -> PaymentStatus` (3)
 
 ### `tests/test_webhook.py` — 45 строк
 
