@@ -31,6 +31,13 @@
   - `outbox_batch_size: int` = `100`
   - `outbox_poll_interval: float` = `1.0`
   - `retry_base_delay: float` = `2.0`
+  - `webhook_timeout: float` = `5.0`
+
+### `app/consumer.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `ATTEMPT_HEADER` = `'x-attempt'`
+- `ERROR_HEADER` = `'x-error'`
 
 ### `app/gateway.py`
 
@@ -76,6 +83,14 @@
 ### `app/payments.py`
 
 - `Sessions` = `async_sessionmaker[AsyncSession]`
+
+### `app/processing.py`
+
+- `class Processor`
+  - `session_factory: async_sessionmaker[AsyncSession]`
+  - `http: httpx.AsyncClient`
+  - `rng: random.Random`
+  - `sleep: Sleep` = `asyncio.sleep`
 
 ### `app/relay.py`
 

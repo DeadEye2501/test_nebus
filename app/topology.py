@@ -1,6 +1,6 @@
 """Топология RabbitMQ: обменник платежей, рабочая очередь, очереди повторов и DLQ."""
 
-from faststream.rabbit import ExchangeType, RabbitBroker, RabbitExchange, RabbitQueue
+from faststream.rabbit import Channel, ExchangeType, RabbitBroker, RabbitExchange, RabbitQueue
 
 MAX_ATTEMPTS = 3
 EXCHANGE = RabbitExchange("payments", type=ExchangeType.DIRECT, durable=True)
@@ -33,3 +33,8 @@ async def declare(broker: RabbitBroker, base_delay: float) -> None:
     for queue in [NEW_QUEUE, *retries, RabbitQueue(DLQ_KEY, durable=True)]:
         declared = await broker.declare_queue(queue)
         await declared.bind(exchange, routing_key=queue.name)
+
+
+def make_broker(url: str) -> RabbitBroker:
+    # Без on_return_raises возврат немаршрутизируемой копии не заметили бы, и оригинал был бы потерян.
+    return RabbitBroker(url, default_channel=Channel(on_return_raises=True))

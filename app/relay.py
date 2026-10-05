@@ -3,14 +3,14 @@
 import asyncio
 import logging
 
-from faststream.rabbit import Channel, RabbitBroker
+from faststream.rabbit import RabbitBroker
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings, get_settings
 from app.db import get_sessionmaker
 from app.models import OutboxEvent
-from app.topology import EXCHANGE, NEW_KEY, declare
+from app.topology import EXCHANGE, NEW_KEY, declare, make_broker
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +51,7 @@ async def run(
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
     settings = get_settings()
-    broker = RabbitBroker(
-        settings.rabbitmq_url, default_channel=Channel(on_return_raises=True)
-    )
+    broker = make_broker(settings.rabbitmq_url)
     await broker.connect()
     await declare(broker, settings.retry_base_delay)
     await run(get_sessionmaker(), broker, settings)

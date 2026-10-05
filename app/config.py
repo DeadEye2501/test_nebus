@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     outbox_batch_size: int = 100
     outbox_poll_interval: float = 1.0
     retry_base_delay: float = 2.0
+    webhook_timeout: float = 5.0
 
 
 @lru_cache
